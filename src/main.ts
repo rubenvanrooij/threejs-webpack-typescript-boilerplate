@@ -2,6 +2,9 @@ import * as THREE from 'three';
 import Stats  from 'stats.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { GUI } from 'dat.gui';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { FilmPass } from 'three/examples/jsm/postprocessing/FilmPass.js';
 
 const TWO_PI = Math.PI * 2;
 
@@ -33,6 +36,16 @@ const camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerH
 camera.position.set(0, 0, 5);
 scene.add(camera);
 
+// setup effecet composer and add passes
+const composer = new EffectComposer( renderer );
+const renderPass = new RenderPass( scene, camera );
+composer.addPass( renderPass );
+
+// const filmPass = new FilmPass(0.5, 0.05, 4096, 1);
+// console.log(filmPass)
+// composer.addPass( filmPass );
+
+
 // Add the orbit control
 const cameraControls = new OrbitControls(camera, renderer.domElement);
 cameraControls.minDistance = 10;
@@ -43,10 +56,24 @@ scene.add(new THREE.ArrowHelper(ambientLight.position));
 scene.add(ambientLight);
 
 // Add a directional light to the scene
-const directionalLight = new THREE.DirectionalLight(new THREE.Color(1, 1, 1), 1);
-directionalLight.position.set(0, 2, 0);
+
+const lightData = {
+    color: new THREE.Color(1, 1, 1),
+    intensity: 1,
+    position: new THREE.Vector3(0, 2, 0)
+};
+
+const directionalLight = new THREE.DirectionalLight(lightData.color, lightData.intensity);
+directionalLight.position.set(lightData.position.x, lightData.position.y, lightData.position.z)
 scene.add(directionalLight);
 scene.add(new THREE.DirectionalLightHelper(directionalLight));
+
+function updateDirectionalLight() {
+    console.log(lightData.color);
+    directionalLight.color.set(new THREE.Color(lightData.color.r/255, lightData.color.g/255, lightData.color.b/255));
+    directionalLight.intensity = lightData.intensity;
+    directionalLight.position.set(lightData.position.x, lightData.position.y, lightData.position.z)
+}
 
 // Create some awesome torus geometry!
 const torusGeometryData = {
@@ -76,6 +103,11 @@ document.body.appendChild( stats.dom );
 
 // Create GUI
 const gui = new GUI();
+
+const dLightFolder = gui.addFolder( 'DirectionalLight' );
+dLightFolder.addColor( lightData, 'color').onChange( updateDirectionalLight );
+dLightFolder.add( lightData, 'intensity', 0, 50 ).onChange( updateDirectionalLight );
+
 const folder = gui.addFolder( 'TorusGeometry' );
 folder.add( torusGeometryData, 'radius', 1, 20 ).onChange( generateTorusGeometry );
 folder.add( torusGeometryData, 'tube', 0.1, 10 ).onChange( generateTorusGeometry );
@@ -83,6 +115,7 @@ folder.add( torusGeometryData, 'radialSegments', 2, 30 ).step( 1 ).onChange( gen
 folder.add( torusGeometryData, 'tubularSegments', 3, 200 ).step( 1 ).onChange( generateTorusGeometry );
 folder.add( torusGeometryData, 'arc', 0.1, TWO_PI ).onChange( generateTorusGeometry );
 folder.add( torusGeometryData, 'flatShading' ).onChange( generateTorusGeometry );
+
 
 function update () {
 
@@ -93,7 +126,7 @@ function update () {
 }
 
 function render() {
-    renderer.render(scene, camera);
+    composer.render();
 }
 
 // Don't touch this one!
