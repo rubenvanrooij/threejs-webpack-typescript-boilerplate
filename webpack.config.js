@@ -9,8 +9,14 @@ module.exports = {
     devtool: 'inline-source-map',
     output: {
         path: path.resolve(__dirname, 'dist'),
-        filename: 'bundle.js'
+        filename: 'bundle.js',
     },
+    devServer: {
+        contentBase: [
+          path.join(__dirname, 'dist'),
+          path.join(__dirname, 'assets'),
+        ],
+      },
     resolve: {
         extensions: [ '.tsx', '.ts', '.js' ],
     },
