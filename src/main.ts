@@ -1,3 +1,4 @@
+import { Vector3 } from 'three';
 import * as THREE from 'three';
 import Stats  from 'stats.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
@@ -5,6 +6,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { GUI } from 'dat.gui';
+import { BlobGeometry } from './blob-geometry';
 
 const TWO_PI = Math.PI * 2;
 
@@ -43,7 +45,7 @@ const cameraControls = new OrbitControls(camera, renderer.domElement);
 cameraControls.minDistance = 10;
 
 // Add an ambient light
-const ambientLight = new THREE.AmbientLight(0x00000, 0);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
 scene.add(new THREE.ArrowHelper(ambientLight.position));
 scene.add(ambientLight);
 
@@ -57,15 +59,14 @@ const directionalLightHelper = new THREE.DirectionalLightHelper(directionalLight
 
 scene.add(directionalLightHelper);
 
-// Create some awesome torus geometry!
-const torusGeometryData = {
-    radius: 1,
-    tube: 0.4,
-    radialSegments: 16,
-    tubularSegments: 100,
-    arc: TWO_PI,
-    flatShading: false
-};
+let blobParams = {
+    scale: 0.3,
+    octaves: 6,
+    persistance: 0.5,
+    lacunarity: 1.3,
+    amplitude: 1,
+    frequency: 1,
+}
 
 const bloomParams = {
     exposure: 1,
@@ -74,34 +75,51 @@ const bloomParams = {
     bloomRadius: 0
 };
 
-const torus = new THREE.Mesh();
+const blob = new THREE.Mesh();
+scene.add(blob);
 
-// Generating the geometry is wrapped in a fuction so it can be called by the GUI plugin
-function generateTorusGeometry() {
-    torus.geometry = new THREE.TorusGeometry(torusGeometryData.radius, torusGeometryData.tube, torusGeometryData.radialSegments, torusGeometryData.tubularSegments, torusGeometryData.arc);
-    torus.material = new THREE.MeshPhongMaterial( { color: 0x156289, emissive: 0x072534, flatShading: torusGeometryData.flatShading } );
-}
-
-generateTorusGeometry();
-
-scene.add( torus );
+const blobGeometry = new BlobGeometry(2, 64)
+const blobMaterial = new THREE.MeshPhongMaterial( { color: 0x156289, emissive: 0x072534, flatShading: false, wireframe: false } );
+blob.geometry = blobGeometry.geometry
+blob.material = blobMaterial;
 
 // Track statistics
 const stats = new Stats();
 document.body.appendChild( stats.dom );
 
+
+
+const renderScene = new RenderPass( scene, camera );
+
+const bloomPass = new UnrealBloomPass( new THREE.Vector2( window.innerWidth, window.innerHeight ), 1.5, 0.4, 0.85 );
+
+const composer = new EffectComposer( renderer );
+composer.addPass( renderScene );
+composer.addPass( bloomPass );
+
+
+
 // Create GUI
 const gui = new GUI();
-const torusFolder = gui.addFolder( 'TorusGeometry' );
-torusFolder.add( torusGeometryData, 'radius', 1, 20 ).onChange( generateTorusGeometry );
-torusFolder.add( torusGeometryData, 'tube', 0.1, 10 ).onChange( generateTorusGeometry );
-torusFolder.add( torusGeometryData, 'radialSegments', 2, 30 ).step( 1 ).onChange( generateTorusGeometry );
-torusFolder.add( torusGeometryData, 'tubularSegments', 3, 200 ).step( 1 ).onChange( generateTorusGeometry );
-torusFolder.add( torusGeometryData, 'arc', 0.1, TWO_PI ).onChange( generateTorusGeometry );
-torusFolder.add( torusGeometryData, 'flatShading' ).onChange( generateTorusGeometry );
 
 const directionalLightFolder = gui.addFolder( 'directionalLight' );
 directionalLightFolder.add( directionalLight, 'intensity', 0, 20 ).onChange( (value) => directionalLight.intensity = value );
+
+
+const materialFolder = gui.addFolder( 'Material' );
+
+materialFolder.add( blobMaterial, 'shininess', 0, 200, 1 ).onChange((value) => {
+    blobMaterial.shininess = value
+});
+
+materialFolder.add( blobMaterial, 'reflectivity', 0, 1, 0.1 ).onChange((value) => {
+    blobMaterial.reflectivity = value
+});
+
+materialFolder.add( blobMaterial, 'reflectivity', 0, 1, 0.1 ).onChange((value) => {
+    blobMaterial.shininess = value
+});
+
 
 const bloomFolder = gui.addFolder( 'Bloom' );
 
@@ -121,38 +139,64 @@ bloomFolder.add( bloomParams, 'bloomRadius', 0.0, 1.0 ).step( 0.01 ).onChange((v
     bloomPass.radius = Number( value );
 });
 
+const blobFolder = gui.addFolder( 'Blob' );
+blobFolder.add(blobParams, 'scale', 0, 2, 0.01).onChange((value) => {
+    blobParams = {
+        ...blobParams,
+        scale: value
+    }
+});
 
-const renderScene = new RenderPass( scene, camera );
+blobFolder.add(blobParams, 'octaves', 0, 50, 1).onChange((value) => {
+    blobParams = {
+        ...blobParams,
+        octaves: value
+    }
+});
 
-const bloomPass = new UnrealBloomPass( new THREE.Vector2( window.innerWidth, window.innerHeight ), 1.5, 0.4, 0.85 );
+blobFolder.add(blobParams, 'persistance', 0, 2, 0.01).onChange((value) => {
+    blobParams = {
+        ...blobParams,
+        persistance: value
+    }
+});
 
-const composer = new EffectComposer( renderer );
-composer.addPass( renderScene );
-composer.addPass( bloomPass );
+blobFolder.add(blobParams, 'lacunarity', 0, 2, 0.01).onChange((value) => {
+    blobParams = {
+        ...blobParams,
+        lacunarity: value
+    }
+});
 
-let count = 0;
+blobFolder.add(blobParams, 'frequency', 0, 2, 0.01).onChange((value) => {
+    blobParams = {
+        ...blobParams,
+        frequency: value
+    }
+});
+
+
+blobFolder.add(blobParams, 'amplitude', 0, 2, 0.01).onChange((value) => {
+    blobParams = {
+        ...blobParams,
+        amplitude: value
+    }
+});
+
 
 // Write update loop here!
-function update () {
+function update (a: number) {
 
     cameraControls.update();
 
-    count += 0.01
-
-    directionalLight.position.set(Math.sin(count) * 2, Math.cos(count), Math.cos(count) * 2);
-    directionalLight.target.position.set(0,0,0)
-    directionalLightHelper.update()
-
-    torus.rotation.x += 0.01;
-	torus.rotation.y += 0.01;
+    blobGeometry.update2(a * 0.001, blobParams.scale, blobParams.octaves, blobParams.persistance, blobParams.lacunarity, blobParams.amplitude, blobParams.frequency)
 }
 
 // Don't touch this one!
-function render() {
-
+function render(a: number) {
     stats.begin();
 
-	update();
+	update(a);
 
     composer.render();
 
@@ -161,4 +205,4 @@ function render() {
     requestAnimationFrame( render );
 }
 
-render();
+requestAnimationFrame( render );
